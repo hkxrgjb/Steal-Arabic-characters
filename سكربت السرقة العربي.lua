@@ -740,286 +740,227 @@ tab3:AddButton({
 
 
 
+
+
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 
-
 local autoStealOnJoinLeave = false
 
-
 local function notify(title, text)
-    pcall(function()
-        StarterGui:SetCore("SendNotification", {
-            Title = title,
-            Text = text,
-            Duration = 4
-        })
-    end)
+	pcall(function()
+		StarterGui:SetCore("SendNotification", {
+			Title = title,
+			Text = text,
+			Duration = 4
+		})
+	end)
 end
-
 
 local function getHRP()
-    local char = player.Character or player.CharacterAdded:Wait()
-    return char:WaitForChild("HumanoidRootPart", 10)
+	local char = player.Character or player.CharacterAdded:Wait()
+	return char:WaitForChild("HumanoidRootPart", 10)
 end
-
 
 local function teleportTo(part)
-    local hrp = getHRP()
-    if hrp and part then
-        hrp.CFrame = part.CFrame + Vector3.new(0, 3, 0)
-    end
+	local hrp = getHRP()
+	if hrp and part then
+		hrp.CFrame = part.CFrame + Vector3.new(0, 3, 0)
+	end
 end
-
 
 local function interactWithModel(model)
-    for _, v in ipairs(model:GetDescendants()) do
-        if v:IsA("ProximityPrompt") and v.Enabled then
-            pcall(fireproximityprompt, v)
-            task.wait(0.05)
-            return true
-        end
-    end
-    return false
+	for _, v in ipairs(model:GetDescendants()) do
+		if v:IsA("ProximityPrompt") and v.Enabled then
+			pcall(fireproximityprompt, v)
+			task.wait(0.05)
+			return true
+		end
+	end
+	return false
 end
-
 
 local function wasPromptActivated(model)
-    for _, v in ipairs(model:GetDescendants()) do
-        if v:IsA("ProximityPrompt") then
-            return not v.Enabled or v.Parent == nil
-        end
-    end
-    return false
+	for _, v in ipairs(model:GetDescendants()) do
+		if v:IsA("ProximityPrompt") then
+			return not v.Enabled or v.Parent == nil
+		end
+	end
+	return false
 end
-
-
-local function isValidModel(model, ownerName, standNumber)
-    local inBase = model:FindFirstChild("InBase")
-    local owner = model:FindFirstChild("Owner")
-    local stand = model:FindFirstChild("StandNumber")
-    if not (inBase and owner and stand) then return false end
-    if not inBase:IsA("BoolValue") or not inBase.Value then return false end
-    if not stand:IsA("IntValue") or stand.Value ~= standNumber then return false end
-
-    local realOwnerName = nil
-    if typeof(owner.Value) == "string" then
-        realOwnerName = owner.Value
-    elseif typeof(owner.Value) == "Instance" and owner.Value:IsA("Player") then
-        realOwnerName = owner.Value.Name
-    elseif owner:IsA("StringValue") then
-        realOwnerName = owner.Value
-    elseif owner:IsA("ObjectValue") and owner.Value and owner.Value:IsA("Player") then
-        realOwnerName = owner.Value.Name
-    end
-
-    return realOwnerName == ownerName
-end
-
 
 local function getPlayerBaseByName(ownerName)
-    local bases = Workspace:FindFirstChild("Bases")
-    if not bases then return nil end
-    for i = 1, 8 do
-        local base = bases:FindFirstChild("Base" .. i)
-        if base and base:FindFirstChild("Owner") then
-            local o = base.Owner.Value
-            local oName = nil
-            if typeof(o) == "Instance" and o:IsA("Player") then
-                oName = o.Name
-            elseif type(o) == "string" then
-                oName = o
-            end
-            if oName == ownerName then
-                return base
-            end
-        end
-    end
-    return nil
+	local bases = Workspace:FindFirstChild("Bases")
+	if not bases then return nil end
+	for i = 1, 8 do
+		local base = bases:FindFirstChild("Base" .. i)
+		if base and base:FindFirstChild("Owner") then
+			local o = base.Owner.Value
+			local oName = typeof(o) == "Instance" and o:IsA("Player") and o.Name or tostring(o)
+			if oName == ownerName then
+				return base
+			end
+		end
+	end
+	return nil
 end
 
+local function isValidModel(model, ownerName, standNumber)
+	local inBase = model:FindFirstChild("InBase")
+	local owner = model:FindFirstChild("Owner")
+	local stand = model:FindFirstChild("StandNumber")
+	if not (inBase and owner and stand) then return false end
+	if not inBase:IsA("BoolValue") or not inBase.Value then return false end
+	if not stand:IsA("IntValue") or stand.Value ~= standNumber then return false end
 
-local function executeStealAllForPlayer(playerName)
-    if playerName == player.Name then
-        notify("تم التجنب", "تم منع السرقة على حسابك الشخصي.")
-        return
-    end
+	local realOwnerName = nil
+	if typeof(owner.Value) == "string" then
+		realOwnerName = owner.Value
+	elseif typeof(owner.Value) == "Instance" and owner.Value:IsA("Player") then
+		realOwnerName = owner.Value.Name
+	elseif owner:IsA("StringValue") then
+		realOwnerName = owner.Value
+	elseif owner:IsA("ObjectValue") and owner.Value and owner.Value:IsA("Player") then
+		realOwnerName = owner.Value.Name
+	end
 
-    local hrp = getHRP()
-    local origin = hrp.CFrame
-
-    local basesFolder = Workspace:FindFirstChild("Bases")
-    if basesFolder then
-        for i = 1, 8 do
-            local base = basesFolder:FindFirstChild("Base" .. i)
-            if base and base:FindFirstChild("Owner") then
-                local ownerVal = base.Owner.Value
-                local ownerName = nil
-                if typeof(ownerVal) == "Instance" and ownerVal:IsA("Player") then
-                    ownerName = ownerVal.Name
-                elseif type(ownerVal) == "string" then
-                    ownerName = ownerVal
-                end
-                if ownerName == playerName then
-                    local stands = base:FindFirstChild("Stands")
-                    if stands then
-                        for j = 1, 27 do
-                            local stand = stands:FindFirstChild("Stand" .. j)
-                            local targetModel = nil
-                            if stand then
-                                for _, v in ipairs(stand:GetChildren()) do
-                                    if v:IsA("Model") and v:FindFirstChild("Proxy") then
-                                        targetModel = v
-                                        break
-                                    end
-                                end
-                            end
-
-                            if targetModel then
-                                local proxy = targetModel:FindFirstChild("Proxy") or targetModel
-                                teleportTo(proxy)
-                                task.wait(0.05)
-                                interactWithModel(targetModel)
-                                task.wait(0.05)
-                                if not wasPromptActivated(targetModel) then
-                                    interactWithModel(targetModel)
-                                end
-
-
-                                local myBase = getPlayerBaseByName(playerName)
-                                if myBase then
-                                    local xAmount = myBase:FindFirstChild("xAmount")
-                                    if xAmount then
-                                        teleportTo(xAmount)
-                                        local hrp = getHRP()
-                                        local timeout = tick() + 5
-                                        while (hrp.Position - xAmount.Position).Magnitude > 5 and tick() < timeout do
-                                            task.wait(0.1)
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-
-    local movingOnFolder = Workspace:FindFirstChild("MovingOn")
-    if movingOnFolder then
-        for _, item in ipairs(movingOnFolder:GetChildren()) do
-            if isValidModel(item, playerName, item:FindFirstChild("StandNumber") and item.StandNumber.Value or 0) then
-                local standNum = item:FindFirstChild("StandNumber") and item.StandNumber.Value or 0
-
-                local foundInBases = false
-                if basesFolder then
-                    for i = 1, 8 do
-                        local base = basesFolder:FindFirstChild("Base" .. i)
-                        if base and base:FindFirstChild("Owner") and base.Owner.Value == playerName then
-                            local stands = base:FindFirstChild("Stands")
-                            if stands and stands:FindFirstChild("Stand" .. standNum) then
-                                foundInBases = true
-                                break
-                            end
-                        end
-                    end
-                end
-                if not foundInBases then
-                    local proxy = item:FindFirstChild("Proxy") or item
-                    teleportTo(proxy)
-                    task.wait(0.05)
-                    interactWithModel(item)
-                    task.wait(0.05)
-                    if not wasPromptActivated(item) then
-                        interactWithModel(item)
-                    end
-
-                    local myBase = getPlayerBaseByName(playerName)
-                    if myBase then
-                        local xAmount = myBase:FindFirstChild("xAmount")
-                        if xAmount then
-                            teleportTo(xAmount)
-                            local hrp = getHRP()
-                            local timeout = tick() + 5
-                            while (hrp.Position - xAmount.Position).Magnitude > 5 and tick() < timeout do
-                                task.wait(0.1)
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-
-    for _, item in ipairs(Workspace:GetChildren()) do
-        if item:IsA("Model") and isValidModel(item, playerName, item:FindFirstChild("StandNumber") and item.StandNumber.Value or 0) then
-            local proxy = item:FindFirstChild("Proxy") or item
-            teleportTo(proxy)
-            task.wait(0.05)
-            interactWithModel(item)
-            task.wait(0.05)
-            if not wasPromptActivated(item) then
-                interactWithModel(item)
-            end
-
-            local myBase = getPlayerBaseByName(playerName)
-            if myBase then
-                local xAmount = myBase:FindFirstChild("xAmount")
-                if xAmount then
-                    teleportTo(xAmount)
-                    local hrp = getHRP()
-                    local timeout = tick() + 5
-                    while (hrp.Position - xAmount.Position).Magnitude > 5 and tick() < timeout do
-                        task.wait(0.1)
-                    end
-                end
-            end
-        end
-    end
-
-
-    hrp.CFrame = origin
-    notify("سرقة تلقائية", "تمت سرقة كل العناصر للاعب: " .. playerName)
+	return realOwnerName == ownerName
 end
 
+-- تنفيذ السرقة الذكية المستمرة
+local function executeSmartStealForPlayer(playerName)
+	if playerName == player.Name then return end
 
-local function onToggleChanged(state)
-    autoStealOnJoinLeave = state
-    if state then
-        notify("تم التفعيل", "سيتم السرقة تلقائياً عند دخول أو خروج أي لاعب.")
-    else
-        notify("تم الإيقاف", "تم إيقاف السرقة التلقائية.")
-    end
+	local hrp = getHRP()
+	local origin = hrp.CFrame
+
+	local base = getPlayerBaseByName(playerName)
+	local stands = base and base:FindFirstChild("Stands")
+	local ownerVal = base and base:FindFirstChild("Owner")
+	local ownerName = ownerVal and ownerVal.Value and (typeof(ownerVal.Value) == "Instance" and ownerVal.Value.Name or tostring(ownerVal.Value))
+
+	if not base or not stands or not ownerName then return end
+
+	-- متغير لتتبع ما إذا تم العثور على كائنات للسرقة في الدورة الحالية
+	local foundAny = true
+
+	while foundAny do
+		foundAny = false -- نفترض لا يوجد كائنات في البداية
+
+		for i = 1, 27 do
+			local stand = stands:FindFirstChild("Stand" .. i)
+			local targetModel = nil
+
+			-- البحث داخل Stand
+			if stand then
+				for _, v in ipairs(stand:GetChildren()) do
+					if v:IsA("Model") and v:FindFirstChild("Proxy") then
+						targetModel = v
+						break
+					end
+				end
+			end
+
+			-- البحث في MovingOn
+			if not targetModel then
+				local folder = Workspace:FindFirstChild("MovingOn")
+				if folder then
+					for _, item in ipairs(folder:GetChildren()) do
+						if isValidModel(item, ownerName, i) then
+							targetModel = item
+							break
+						end
+					end
+				end
+			end
+
+			-- البحث في Workspace العام
+			if not targetModel then
+				for _, item in ipairs(Workspace:GetChildren()) do
+					if item:IsA("Model") and isValidModel(item, ownerName, i) then
+						targetModel = item
+						break
+					end
+				end
+			end
+
+			-- إذا تم العثور على كائن
+			if targetModel then
+				foundAny = true -- وجدنا كائن في هذه الدورة
+
+				local proxy = targetModel:FindFirstChild("Proxy") or targetModel
+				teleportTo(proxy)
+				task.wait(0.1)
+
+				interactWithModel(targetModel)
+				task.wait(0.1)
+
+				if not wasPromptActivated(targetModel) then
+					interactWithModel(targetModel)
+				end
+
+				-- الانتقال إلى xAmount الخاصة بالمستخدم (لاعب السكربت)
+				local myBase = getPlayerBaseByName(player.Name)
+				if myBase then
+					local xAmount = myBase:FindFirstChild("xAmount")
+					if xAmount then
+						teleportTo(xAmount)
+						local timeout = tick() + 5
+						while (getHRP().Position - xAmount.Position).Magnitude > 5 and tick() < timeout do
+							task.wait(0.1)
+						end
+					end
+				end
+			end
+		end
+
+		-- إذا لم يعثر على أي كائن في دورة كاملة تتوقف الحلقة
+		if not foundAny then
+			break
+		end
+	end
+
+	hrp.CFrame = origin
+	notify("✔", "تمت سرقة كل شيء من: " .. playerName)
 end
 
-
+-- زر التبديل
 tab3:AddToggle({
-    Name = "تفعيل سرقة عند دخول/خروج لاعب",
-    Default = false,
-    Callback = onToggleChanged
+	Name = "سرقة عند دخول/خروج لاعب(غير مستقر) ",
+	Default = false,
+	Callback = function(state)
+		autoStealOnJoinLeave = state
+		if state then
+			notify("✅", "تم تفعيل السرقة التلقائية")
+		else
+			notify("⛔", "تم إيقاف السرقة التلقائية")
+		end
+	end
 })
 
-
+-- عند دخول لاعب
 Players.PlayerAdded:Connect(function(plr)
-    if autoStealOnJoinLeave then
-        task.spawn(function()
-            executeStealAllForPlayer(plr.Name)
-        end)
-    end
+	if autoStealOnJoinLeave then
+		task.spawn(function()
+			executeSmartStealForPlayer(plr.Name)
+		end)
+	end
 end)
 
+-- عند خروج لاعب
 Players.PlayerRemoving:Connect(function(plr)
-    if autoStealOnJoinLeave then
-        task.spawn(function()
-            executeStealAllForPlayer(plr.Name)
-        end)
-    end
+	if autoStealOnJoinLeave then
+		task.spawn(function()
+			executeSmartStealForPlayer(plr.Name)
+		end)
+	end
 end)
+
+
+
+
 
 tab:AddLabel("نظام مراقبة وقت البيت")
 
